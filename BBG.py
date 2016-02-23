@@ -3,8 +3,8 @@ from optparse import OptionParser
 import pandas as pd
 import numpy as np
 import pytz
+import msgpack
 import datetime
-import pdb
 
 
 def parseCmdLine():
@@ -545,48 +545,6 @@ def RTmessageToPandas(message):
     return pd.Series(output)
 
 
-# def getNonSettlementDates(CDRCode, start_date, end_date):
-#     """
-#     Returns Series of dates given 'CDR_COUNTRY_CODE'
-#     """
-#     session = createSession()
-#     if not session.openService("//blp/refdata"):
-#         print "Failed to open //blp/refdata"
-#     refDataService = session.getService("//blp/refdata")
-#     request = refDataService.createRequest("ReferenceDataRequest")
-
-#     request.append('securities', 'USD Curncy')
-#     request.append('fields', 'CALENDAR_NON_SETTLEMENT_DATES')
-
-#     overrides = request.getElement("overrides")
-#     override_fields = ['SETTLEMENT_CALENDAR_CODE', 'CALENDAR_START_DATE', 'CALENDAR_END_DATE']
-#     override_values = [CDRCode, start_date, start_date]
-
-#     for fld, val in zip(override_fields, override_values):
-#         override = overrides.appendElement()
-#         override.setElement("fieldId", fld)
-#         override.setElement("value", val)
-
-#     session.sendRequest(request)
-#     output = []
-#     loop = True
-#     try:
-#         while(loop):
-#             event = session.nextEvent()
-#             for msg in event:
-#                 if event.eventType() == blpapi.Event.RESPONSE or event.eventType() == blpapi.Event.PARTIAL_RESPONSE:
-#                     securityDataArray = msg.getElement(blpapi.Name("securityData"))
-#                     for securityData in securityDataArray.values():
-#                         fieldData = securityData.getElement(blpapi.Name("fieldData"))
-#                         for field in fieldData.elements():
-#                             ratings = field.values()
-#                             for i, rating in enumerate(ratings):
-#                                 for element in rating.elements():
-#                                     output.append(element.getValue())
-#                         return pd.Series(output)
-#     finally:
-#         endSession(session)
-
 def getNonSettlementDates(CDRCode):
     """
     Returns Series of dates given 'CDR_COUNTRY_CODE'
@@ -660,41 +618,12 @@ def isExchangeHolidayByTicker(ticker, date):
 
     return result
 
-# def getExchangeHolidaysByTickers(tickers, start_date, end_date):
-#     # Increment start_date by one business day so that INCLUSIVE of date
 
-#     # Get CDR Country code for all tickers
-
-#     country = tickers.split()[1]
-
-#     # screen for several null exchange fields
-#     if country == 'US':
-#         code = 'EX'
-#     elif country == 'LN':
-#         code = 'LS'
-#     else:
-#         code = getFields(tickers, "CDR_EXCH_CODE")
-
-#     # Get unique country codes
-#     codes = data["CDR_EXCH_CODE"].unique().tolisqt()
-
-#     output = {}
-
-#     # Get isOpen values for all codes
-#     for code in codes:
-
-#         # Get all settlement dates for the the CODE (date ranges dont work)
-#         dates = getNonSettlementDates(code, start_date, end_date)
-
-#         # Subset that applies for givem dates
-#         dates = dates[(dates >= start_date) & (dates <= end_date)]
-
-#         # Get tickers that apply
-#         subset = data[data.CDR_EXCH_CODE == code].index.values
-
-#         # Add dates for every ticker that applies
-#         for t in subset:
-#             output[t] = dates
-
-#     return output
+def getExchangeTimesByTicker(ticker):
+    """
+    Bloomberg trade codes to ignore during VWAP calculations. Ticker like "MSFT US Equity"
+    """
+    # Read file
+    with open('exchangeTimes', 'r') as myfile:
+        return msgpack.unpackb(myfile.read())[ticker.split(' ')[1]]
 
