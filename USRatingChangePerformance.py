@@ -5,7 +5,6 @@ import pdb, traceback, sys
 import pandas as pd
 from pandas import Timestamp
 import pytz
-import Data
 import userInfo
 
 n = 0
@@ -127,7 +126,7 @@ def convertData(ticker, timestamp, id):
     emailTime = datetime.datetime.time(timestamp)
 
     try:
-        local = Data.getExchangeTimesByTicker(ticker)
+        local = BBG.getExchangeTimesByTicker(ticker)
     except:
         local = {'open': [9,30], 'close': [16,00], 'zone': 'America/New_York'}
 
@@ -273,7 +272,7 @@ def isHoliday(ticker, date):
     """
     formats date then returns bool if date is in list of holidays
     """
-    
+
     date = date.replace(tzinfo = None)
     date = datetime.datetime.date(date)
 
