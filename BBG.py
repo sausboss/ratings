@@ -627,3 +627,39 @@ def getExchangeTimesByTicker(ticker):
     with open('exchangeTimes', 'r') as myfile:
         return msgpack.unpackb(myfile.read())[ticker.split(' ')[1]]
 
+
+def nearEarnings(ticker, nextSession, prevSession):
+    """
+    takes 2 datetime objects and returns bolean indicating if an earnings event alines with either date
+    """
+
+    earnings = False
+    nextSession = datetime.datetime.strptime(nextSession, '%Y%m%d')
+    nextSession = datetime.datetime.date(nextSession)
+
+    prevSession = datetime.datetime.strptime(prevSession, '%Y%m%d')
+    prevSession = datetime.datetime.date(prevSession)
+
+    # find last earnings report date
+    try:
+        announcement = getSingleField(ticker, 'Latest_Announcement_DT')
+
+        if nextSession == announcement or prevSession == announcement:
+            earnings = True
+    except:
+        pass
+
+    # find next earnings report date
+    try:
+        exAnn = getSingleField(ticker, 'Expected_Report_DT')
+        t1 = nextSession + pd.tseries.offsets.BDay()
+        t1 = pd.Timestamp(prevSession).to_datetime().strftime('%Y%m%d')
+        t1 = datetime.datetime.strptime(t1, '%Y%m%d')
+        t1 = datetime.datetime.date(t1)
+
+        if t1 == exAnn or nextSession == exAnn:
+            earnings = True
+    except:
+        pass
+
+    return earnings
