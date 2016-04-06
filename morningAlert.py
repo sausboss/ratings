@@ -34,6 +34,8 @@ def todaysList():
 
     df = pd.read_sql("select * from ratings_change where date > %(cutOff)s", DB, params={'cutOff' : cutOff})
 
+    DB.close()
+
     # calulate surrent median earnings and add to data frame
     df = getMedian(df)
 
@@ -117,18 +119,13 @@ def analystScreen(df):
     completedAnalysts = []
 
     # isolate upgrade action calls performance and return median value
-    # action call is a view other than neutral
+    for index, row in df.iterrows():
 
-    for name in df['analyst']:
+        name = row['analyst']
+        firm = row['firm']
 
         # check to see if analyst already done
         if name not in completedAnalysts:
-
-            analyst = name
-
-            # get firm name from Df
-            analystDf = df.query(df.analyst == name)
-            firm = analystDf['firm'].values[0]
 
             avgAbsDayMove = 0
             count = 0
@@ -138,6 +135,8 @@ def analystScreen(df):
             upgradeDf = pd.read_sql("select performancepct, rating from performance join ratings_change on performance.event_id = ratings_change.id where analyst = %(analyst)s and type = 'upgrade' and earnings = False", DB, params={'analyst' : name})
 
             downgradeDf = pd.read_sql("select performancepct, rating from performance join ratings_change on performance.event_id = ratings_change.id where analyst = %(analyst)s and type = 'downgrade' and earnings = False", DB, params={'analyst' : name})
+
+            DB.close()
 
             # list of "action" ratings
             upRatingList = ['outperform', 'buy', 'overweight', 'accumulate', 'sector outperformer', 'add']
@@ -161,7 +160,7 @@ def analystScreen(df):
             # scrub df for non-action calls
             upgradeDf = upgradeDf[upgradeDf.buyRated == True]
 
-            #total amount of up cases
+            # total amount of up cases
             upCount = upgradeDf.count().values[0]
 
             # calculate median pt from listy
@@ -193,7 +192,6 @@ def analystScreen(df):
                 # calculate median pt from list
                 medianDown = downgradeDf['performancepct'].median()
 
-            # TODO account for nan
             # calulate avg analyst return
             try:
                 medianSum = medianUp + abs(medianDown)
@@ -208,7 +206,7 @@ def analystScreen(df):
             # filter for > 2% impact on stocks rated
             if avgAbsDayMove > 2 and count > 2:
 
-                print analyst + " | " + firm + " | " + str(avgAbsDayMove) + "  #events = " + str(count)
+                print name + " | " + firm + " | " + str(avgAbsDayMove) + "  #events = " + str(count)
 
                 analystDf = df[df.analyst == name]
                 analystDf = analystDf.loc[:, ['ticker', 'pt', 'med_pt', 'type', 'rating']]
@@ -217,11 +215,64 @@ def analystScreen(df):
                 print analystDf
                 print ""
                 print ""
+                print ""
 
             completedAnalysts.append(name)
 
 
-    # get total number of events taken into consideration
+def antiConsensus(df):
+    """
+    indicates "action" call is opposite the Street in the specified time frame
+    """
+
+    df = df[df.type.isin(['upgrade', 'downgrade'])]
+
+
+    DB = sqlQuery.connect()
+    eventDf = pd.read_sql("select * from ratings_change", DB)
+
+    DB.close()
+
+    # time-frame is set for last 6 months, returns datetime object
+    timeFrame = datetime.datetime.now() - datetime.timedelta(days=6*365/12)
+    timeFrame = pytz.timezone('America/New_York').localize(timeFrame)
+
+    eventDf = eventDf[eventDf.date > timeFrame]
+
+    print ""
+    print "ANTI CONSENSUS CALLS"
+    print "--------------------"
+
+    for index, row in df.iterrows():
+
+        idNumber = row['id']
+        ticker = row['ticker']
+        t = row['type']
+
+        # find past events for respective ticker
+        pastList = eventDf[eventDf.ticker == ticker]
+
+        # account for event already existing in DB
+        pastList = pastList[pastList.id != idNumber]
+
+        count = pastList.count().values[0]
+
+        # specifies number of events to screen by
+        if count > 2:
+
+            typeList = pastList[pastList.type == t]
+
+            if typeList.empty:
+
+                print ""
+                print "First " + row['type'] + " in 6 months"
+                print ticker + " | " + row['analyst'] + " | " + row['firm'] + " | " + row['rating'] + " | " + "  #events = " + str(count)
+
+            else:
+                pass
+
+        else:
+            pass
 
 
 def getMedian(df):
@@ -253,6 +304,8 @@ if __name__ == '__main__':
         df = todaysList()
         highLowScreen(df)
         analystScreen(df)
+        antiConsensus(df)
+
     except:
         type, value, tb, = sys.exc_info()
         traceback.print_exc()
