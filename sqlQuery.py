@@ -59,7 +59,7 @@ def tickerMoving(ticker):
     # establish DB connection
     DB = connect()
 
-    upDf  = pd.read_sql("select analyst, firm, type, rating, performancepct from ratings_change join performance on ratings_change.id = performance.event_id where ticker = %(ticker)s and earnings = False order by performancepct DESC limit 6", DB, params={'ticker' : ticker})
+    upDf = pd.read_sql("select analyst, firm, type, rating, performancepct from ratings_change join performance on ratings_change.id = performance.event_id where ticker = %(ticker)s and earnings = False order by performancepct DESC limit 6", DB, params={'ticker' : ticker})
 
     downDf = pd.read_sql("select analyst, firm, type, rating, performancepct from ratings_change join performance on ratings_change.id = performance.event_id where ticker = %(ticker)s and earnings = False order by performancepct ASC limit  6", DB, params={'ticker' : ticker})
 
