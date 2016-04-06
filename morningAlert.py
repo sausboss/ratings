@@ -42,23 +42,25 @@ def todaysList():
     # adds earnings column to dataframe
     earningsList = []
 
-    # establishes paremters of when to look for earnings events
+    # returns date strings to screen out events affected by earnings
     now = datetime.datetime.now()
-    nextSession = now + pd.tseries.offsets.BDay()
-    nextSession = nextSession.strftime('%Y%m%d')
-    prevSession = now - pd.tseries.offsets.BDay()
-    prevSession = prevSession.strftime('%Y%m%d')
+    today = now.date()
+    nextSession = today + pd.tseries.offsets.BDay()
+    nextSession = nextSession.to_datetime().date()
+
+    prevSession = today - pd.tseries.offsets.BDay()
+    prevSession = prevSession.to_datetime().date()
 
     # takes df, looks at each ticker, compares input dates, returns bool, appends to list
     for ticker in df['ticker']:
-        hasEarnings = BBG.nearEarnings(ticker, nextSession, prevSession)
+        hasEarnings = BBG.nearEarnings(ticker, today, nextSession, prevSession)
         earningsList.append(hasEarnings)
 
     # add list as new column
     df['earnings'] = earningsList
 
     # create df to hold earnings names, for potential future use
-    earningsName = df[df.earnings == True]
+    earningsNames = df[df.earnings == True]
 
     # scrub df for events that could be affected by earnings
     df = df[df.earnings == False]
@@ -226,7 +228,6 @@ def antiConsensus(df):
     """
 
     df = df[df.type.isin(['upgrade', 'downgrade'])]
-
 
     DB = sqlQuery.connect()
     eventDf = pd.read_sql("select * from ratings_change", DB)
