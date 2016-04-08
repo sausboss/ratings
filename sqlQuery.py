@@ -20,20 +20,6 @@ def connect():
     return psycopg2.connect(loginValues['DB'])
 
 
-def freeFormRequest(request):
-    """
-    takes free form SQL request as string, returns a dataframe
-    """
-
-    DB = connect()
-
-    # SQL request
-    freeFormQuery = pd.read_sql(request, DB)
-
-    DB.close()
-
-    return freeFormQuery
-
 
 def firmHistory(ticker, firm):
     """
