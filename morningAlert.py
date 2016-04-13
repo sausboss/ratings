@@ -120,6 +120,12 @@ def analystScreen(df):
 
     completedAnalysts = []
 
+    print ""
+    print "ANALYST SCREEN"
+    print "--------------"
+    print ""
+    print ""
+
     # isolate upgrade action calls performance and return median value
     for index, row in df.iterrows():
 
@@ -267,7 +273,8 @@ def antiConsensus(df):
 
                 print ""
                 print "First " + row['type'] + " in 6 months"
-                print ticker + " | " + row['analyst'] + " | " + row['firm'] + " | " + row['rating'] + " | " + "  #events = " + str(count)
+                print row['rating'] + " | " + str(row['pt']) + " | Median PT " + str(row['med_pt'])
+                print ticker + " | " + row['analyst'] + " | " + row['firm'] + " | " + " #events = " + str(count)
 
             else:
                 pass

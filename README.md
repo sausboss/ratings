@@ -18,23 +18,22 @@ ANALYSIS FUNCTIONS
 
 sqlQuery:
 
--freeFormRequest():  passes in written request as the argument.  Must be SQL syntax.
-
--firmHistory(ticker,firm): checks for events that a broker made on a specific ticker
+- firmHistory("ticker", "firm"): checks for events that a broker made on a specific ticker
 		arguments: stock ticker, brokerage firm
 		** both args are strings
 
--tickerMoving(ticker):  finds the 6 events that moved the stock the most in both directions (12 in total).
+- tickerMoving("ticker"):  finds the 6 events that moved the stock the most in both directions (12 in total).
 		arguments: stock ticker
 		** string
 
--analystPerformance(name):  takes analyst name, returns the meadian absolute average percent they moved stocks on "action" calls, and the count of events, for context.
-		arguments: analyst name
-		** string
+- analystReturn("Analyst Name"):  takes in string, returns the meadian absolute percent tickers moved on "action" calls, and the count of events, for context.
 
--firmPerformanceByRegion(firmName, fx): Looks at how well a brokers' action calls do in a certian region (i.e. Nomura in Europe)
-		arguments: brokerage firm, fx (i.e. "EUR")
-		** both are args strings
+- frimReturn("Firm Name"):  takes in string, and searchs for firm with names similar.  Returns median absolulte percent tickers moved on action calls, and a list of exact firm names used in DB.
+
+- firmPerformanceByRegion("Firm Name", "fx"):  Looks at how well a brokers' action calls do in a certian region (i.e. Nomura in Europe).
+
+- fromOpen("Date"):  Returns events that have a greater than %2 difference between open and close, respective of call. 
+
 		
 ---
 

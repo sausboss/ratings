@@ -1,6 +1,7 @@
 import psycopg2
 import pandas as pd
 import userInfo
+import pdb
 
 
 """
@@ -18,7 +19,6 @@ def connect():
     """
 
     return psycopg2.connect(loginValues['DB'])
-
 
 
 def firmHistory(ticker, firm):
@@ -56,9 +56,9 @@ def tickerMoving(ticker):
     print downDf
 
 
-def analystPerformance(name):
+def analystReturn(name):
     """
-    get past analyst performance by name
+    returns median firm performance on action calls
     """
 
     DB = connect()
@@ -76,9 +76,9 @@ def analystPerformance(name):
     print " | " + str(performance) + " | "  "# of calls = " + str(count)
 
 
-def firmPerformance(firmName):
+def firmReturn(firmName):
     """
-    returns general firm performance on action calls
+    returns median firm performance on action calls
     """
 
     firm = '%' + firmName + '%'
@@ -88,12 +88,16 @@ def firmPerformance(firmName):
 
     downgradeDf = pd.read_sql("select performancepct, rating from performance join ratings_change on performance.event_id = ratings_change.id where firm like %(firm)s and type = 'downgrade' and earnings = False", DB, params={'firm' : firm})
 
+    # finds all names used in DB for the firm
+
+    dbNames = pd.read_sql("select firm from ratings_change where firm like %(firm)s group by firm", DB, params={'firm': firm})
+
     DB.close()
 
     # gets median absolute performance of all "action" calls
     (performance, count) = absolutePerformance(upgradeDf, downgradeDf)
 
-    print firmName
+    print dbNames.values
     print "Action Calls"
     print " | " + str(performance) + " | "  "# of calls = " + str(count)
 
@@ -192,3 +196,51 @@ def absolutePerformance(upgradeDf, downgradeDf):
             avgAbsDayMove = medianDown
 
     return avgAbsDayMove, count
+
+
+def pastDate(date):
+    """
+    takes in date string and returns dataframe with events and coresponding performance 
+    """
+
+    DB = connect()
+    df = pd.read_sql("select * from ratings_change join performance on ratings_change.id = performance.event_id where t1date = %(date)s and earnings = False", DB, params={'date': date})
+
+    DB.close()
+
+    return df
+
+
+def fromOpen(date):
+    """
+    finds day's events where the most return could be gained
+    """
+
+    df = pastDate(date)
+    outputs = ['ticker', 'sinceOpen', 'type', 'rating', 'firm']
+
+    # caluclate difference between where stock opened and where it closed
+    df['sinceOpen'] = df['performancepct'] - df['openpct']
+
+    # sort for differences + or - %2
+    df = df[(df.sinceOpen > 2) | (df.sinceOpen < -2)]
+
+    # scrub df of opposite way performance
+    upDf = df[(df.sinceOpen > 2) & (df.type == 'upgrade')]
+    dnDf = df[(df.sinceOpen < -2) & (df.type == 'downgrade')]
+
+    otherDf = df[(df.type != 'upgrade') & (df.type != 'downgrade')]
+
+    print "Upgrades"
+    print "--------"
+    print upDf.loc[:, outputs]
+    print ""
+
+    print "Downgrades"
+    print "----------"
+    print dnDf.loc[:, outputs]
+    print ""
+
+    print "Other Calls"
+    print "-----------"
+    print otherDf.loc[:, outputs]
