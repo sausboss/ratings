@@ -7,6 +7,7 @@ from pandas import Timestamp
 import pytz
 import userInfo
 
+
 n = 0
 loginValues = userInfo.loginValues
 
@@ -19,6 +20,9 @@ def connect():
 
 
 def writeToDB(nextSession, prevClose, nextOpen, nextDayHigh, nextDayLow, nextClose, earnings, id):
+    """
+    adds performance values to DB
+    """
 
     performance = ((nextClose - prevClose) / prevClose) * 100
     highpct = ((nextDayHigh - prevClose) / prevClose) * 100
@@ -48,6 +52,7 @@ def skipEvent(timestamp, id):
     now = pytz.timezone('America/New_York').localize(now).astimezone(pytz.timezone('America/New_York'))
     t7 = timestamp + pd.tseries.offsets.Week()
 
+    # check if event info has been left blank for 7 days
     if now > t7:
 
         nextSession = Timestamp(timestamp).to_datetime().strftime('%Y%m%d')
@@ -74,7 +79,7 @@ def skipEvent(timestamp, id):
 
 def getEventIDs():
     """
-    finds list of event id's without corresponding price performance data
+    finds list of event id's without corresponding price performance data (t1date)
     """
 
     idList = []
@@ -83,7 +88,7 @@ def getEventIDs():
     DB = connect()
     c = DB.cursor()
 
-    # get all US events
+    # get all events in performance table without a date value
     c.execute('select event_id from performance where t1date is NULL')
 
     idList = c.fetchall()
@@ -92,6 +97,9 @@ def getEventIDs():
     processRow(idList)
 
 def processRow(idList):
+    """
+    looks up event by id, and returns relevent data for use in determining performance
+    """
 
     for id in idList:
 
@@ -105,7 +113,8 @@ def processRow(idList):
         timestamp = event[0][0]
         timestamp = timestamp.replace(tzinfo = None)
         ticker = event[0][1]
-
+        
+        # timestamp is a datetime.datetime object
         convertData(ticker, timestamp, id)
 
 def convertData(ticker, timestamp, id):
@@ -113,6 +122,7 @@ def convertData(ticker, timestamp, id):
     Takes event information from DB, and returns when the event happens in realation to its trading sessions
     """
 
+    # TODO: pull function from BBG file 
     # split out exchange code
     company = ticker.split()[0]
     try:
@@ -125,89 +135,118 @@ def convertData(ticker, timestamp, id):
     emailDate = datetime.datetime.date(timestamp)
     emailTime = datetime.datetime.time(timestamp)
 
+    # find local exchange hours
     try:
         local = BBG.getExchangeTimesByTicker(ticker)
     except:
         local = {'open': [9,30], 'close': [16,00], 'zone': 'America/New_York'}
 
+    # converts local close to datetime.datetime object 
     cmbClose = datetime.datetime.combine(emailDate, datetime.time(*local['close']))
+    # converts local close to corresponding EST value
     estLocalClose = pytz.timezone(local['zone']).localize(cmbClose).astimezone(pytz.timezone('America/New_York'))
 
+    #
+    #
+    #
+    # TODO deal with isreal here
     # Takes in email and time/date, returns next session
+    #
+    #
+    #
     
-    # account for Isreali workweek
-    if country == 'IT':
-        pass
-    #     (adjLocalClose, nextSession, prevSession) = ilsTradeDates(emailTime, estLocalClose)
 
-    # process as normal work week
-    else:
-        if emailTime > estLocalClose.time():
-            adjLocalClose = estLocalClose + pd.tseries.offsets.BDay()
+    # process as normal work week (M-F)
+    if emailTime > estLocalClose.time():
+        
+        # if email after local close, set next day as next session date
+        nextSession = estLocalClose + pd.tseries.offsets.BDay()
 
-            # check to see if holiday exists
-            if isHoliday(ticker, adjLocalClose):
-                while isHoliday(ticker, adjLocalClose):
-                    adjLocalClose = adjLocalClose + pd.tseries.offsets.BDay()
+        # check to see if holiday exists next session, if so, adjust date
+        if isHoliday(ticker, nextSession):
+            while isHoliday(ticker, nextSession):
+                nextSession = nextSession + pd.tseries.offsets.BDay()
 
-            nextSession = Timestamp(adjLocalClose).to_datetime().strftime('%Y%m%d')
-            if isHoliday(ticker, estLocalClose):
-                while isHoliday(ticker, estLocalClose):
-                    estLocalClose = estLocalClose - pd.tseries.offsets.BDay()
-
-            prevSession = Timestamp(estLocalClose).to_datetime().strftime('%Y%m%d')
-            
+        # check to see is email date/ previous session was a holiday
+        if isHoliday(ticker, estLocalClose):
+            while isHoliday(ticker, estLocalClose):
+                prevSession = estLocalClose - pd.tseries.offsets.BDay()
         else:
-            adjLocalClose = estLocalClose
-            
-            # check to see if nextSession is a holiday
-            if isHoliday(ticker, adjLocalClose):
-                while isHoliday(ticker, estLocalClose):
-                    estLocalClose = estLocalClose + pd.tseries.offsets.BDay()
-                
-            nextSession = Timestamp(estLocalClose).to_datetime().strftime('%Y%m%d')
-            # find previous session
-            prevSession = estLocalClose - pd.tseries.offsets.BDay()
+            prevSession = estLocalClose
 
-            # check to see if previous session was holiday
-            if isHoliday(ticker, prevSession):
-                while isHoliday(ticker, prevSession):
-                    prevSession = prevSession - pd.tseries.offsets.BDay()
+    # if email before EST close, use email date as session after rating change
+    else:
+        # set today as next session date
+        nextSession = estLocalClose
 
-            prevSession = Timestamp(prevSession).to_datetime().strftime('%Y%m%d')
+        # check to see if nextSession is a holiday
+        if isHoliday(ticker, nextSession):
+            while isHoliday(ticker, nextSession):
+                nextSession = nextSession + pd.tseries.offsets.BDay()
 
-        # pass on events if the close hasn't yet occuerd
-        now = datetime.datetime.now()
-        now = pytz.timezone('America/New_York').localize(now).astimezone(pytz.timezone('America/New_York'))
+        # find previous session
+        prevSession = estLocalClose - pd.tseries.offsets.BDay()
 
-        if now > adjLocalClose:
+        # check to see if previous session was holiday
+        if isHoliday(ticker, prevSession):
+            while isHoliday(ticker, prevSession):
+                prevSession = prevSession - pd.tseries.offsets.BDay()
 
-            findFields(ticker, nextSession, prevSession, id, adjLocalClose)
+    # check if nextsession has happend yet, if not, pass
+    now = datetime.datetime.now()
+    now = pytz.timezone('America/New_York').localize(now).astimezone(pytz.timezone('America/New_York'))
+
+    if now > nextSession:
+
+        # convert timestamp to datetime date
+        nextSession = nextSession.date()
+        prevSession = prevSession.date()
+
+        # if email before open, or during session, extra day needed to make sure earnings event doesn't interfere with data quality
+        if emailTime < estLocalClose.time():
+            tomorrow = estLocalClose + pd.tseries.offsets.BDay()
+            tomorrow = tomorrow.date()
+
+            earnings = BBG.nearEarnings(ticker, nextSession, tomorrow, prevSession)
+        else:
+            earnings = nearEarnings(ticker, nextSession, prevSession)
+
+        findFields(ticker, nextSession, prevSession, id, earnings)
+
+    else:
+        pass
 
     
-def findFields(ticker, nextSession, prevSession, id, adjLocalClose):
+def findFields(ticker, nextSession, prevSession, id):
     """
     returns bloomberg fields for given event
     """
 
-    # get price data for session after email
+    # save datetime.date object for nextSession, for use in skipEvent()
+    tradeDate = nextSession
+    
+    # convert dates from datetime to strings
+    nextSession = datetime.datetime.strftime(nextSession, '%Y%m%d')
+    prevSession = datetime.datetime.strftime(prevSession, '%Y%m%d')
+    
+    # get price data for session after email, and previous session
     prevClose = BBG.getHistoricalFields(ticker, 'PX_LAST', prevSession, prevSession)
     nextOpen = BBG.getHistoricalFields(ticker, 'PX_OPEN', nextSession, nextSession)
     nextDayHigh = BBG.getHistoricalFields(ticker, 'PX_HIGH', nextSession, nextSession)
     nextDayLow = BBG.getHistoricalFields(ticker, 'PX_LOW', nextSession, nextSession)
     nextClose = BBG.getHistoricalFields(ticker, 'PX_LAST', nextSession, nextSession)
     
-    # check for empty df's and pass up if so
+    # check for empty df's and pass on event if so
     if prevClose.isnull().values[0][0]:
-        skipEvent(adjLocalClose, id)
+        skipEvent(tradeDate, id)
     elif nextOpen.isnull().values[0][0]:
-        skipEvent(adjLocalClose, id)
+        skipEvent(tradeDate, id)
     elif nextDayHigh.isnull().values[0][0]:
-        skipEvent(adjLocalClose, id)
+        skipEvent(tradeDate, id)
     elif nextDayLow.isnull().values[0][0]:
-        skipEvent(adjLocalClose, id)
+        skipEvent(tradeDate, id)
     elif nextClose.isnull().values[0][0]:
-        skipEvent(adjLocalClose, id)
+        skipEvent(tradeDate, id)
     else:
         prevClose = prevClose.values[0][0]
         nextOpen = nextOpen.values[0][0]
@@ -219,14 +258,13 @@ def findFields(ticker, nextSession, prevSession, id, adjLocalClose):
 
         writeToDB(nextSession, prevClose, nextOpen, nextDayHigh, nextDayLow, nextClose, earnings, id)
 
+
 def nearEarnings(ticker, nextSession, prevSession):
+    """
+    takes 2 datetime date objects and returns bolean indicating if an earnings event alines with either date
+    """
 
     earnings = False
-    nextSession = datetime.datetime.strptime(nextSession, '%Y%m%d')
-    nextSession = datetime.datetime.date(nextSession)
-    
-    prevSession = datetime.datetime.strptime(prevSession, '%Y%m%d')
-    prevSession = datetime.datetime.date(prevSession)
 
     # find last earnings report date
     try:
@@ -236,7 +274,7 @@ def nearEarnings(ticker, nextSession, prevSession):
             earnings = True
     except:
         pass
-    
+
     # find next earnings report date
     try:
         exAnn = BBG.getSingleField(ticker, 'Expected_Report_DT')
@@ -280,7 +318,7 @@ def isHoliday(ticker, date):
 
     return result
 
-    
+
 # If file is executed as script
 if __name__ == '__main__':
     try:

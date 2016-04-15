@@ -630,18 +630,11 @@ def getExchangeTimesByTicker(ticker):
 
 def nearEarnings(ticker, today, nextSession, prevSession):
     """
-    takes 3 datetime objects and returns bolean indicating if an earnings event alines with either date
+    takes 3 datetime date objects and returns bolean indicating if an earnings event alines with either date
     """
 
     # add 'US' to American tickers, and properly format for Bloomberg API
-    company = ticker.split()[0]
-
-    try:
-        country = ticker.split()[1]
-    except:
-        country = 'US'
-
-    ticker = company + ' ' + country + ' Equity'
+    ticker = bloombergTicker(ticker)
 
     earnings = False
 
@@ -664,3 +657,22 @@ def nearEarnings(ticker, today, nextSession, prevSession):
         pass
 
     return earnings
+
+
+def bloombergTicker(ticker):
+    """
+    take ticker string and properly format it to interact with bloomberg's API
+    """
+
+    company = ticker.split()[0]
+
+    try:
+        country = ticker.split()[1]
+    except:
+        country = 'US'
+
+    ticker = company + ' ' + country + ' Equity'
+
+    return ticker
+
+
