@@ -5,11 +5,13 @@ GENERAL USAGE NOTES
 -------------------
 
 
-- Parses rating change email maessages, records performance, and performs analysis
+- Parses rating change email messages, records performance, and performs analysis
 
 - "Action" calls refer to ratings with either a buy or sell connotation
 
-- all userinputs and outputs are meant for ipython use in the terminal
+- for 2.0, iPython and terminal is the UI
+
+- sql query functions return pandas dataframe that can be used for further analysis in iPython
 
 
 
