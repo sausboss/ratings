@@ -6,8 +6,6 @@ import datetime
 import BBG
 
 
-# TODO rewirte code flow using cutoff function
-
 def calculateCutoff():
     """
     returns a datetime object of the last business day, at 15:00 EST
@@ -41,6 +39,7 @@ def todaysList():
 
     # adds earnings column to dataframe
     earningsList = []
+    liquidity = []
 
     # returns date strings to screen out events affected by earnings
     now = datetime.datetime.now()
@@ -64,6 +63,32 @@ def todaysList():
 
     # scrub df for events that could be affected by earnings
     df = df[df.earnings == False]
+
+    # TODO
+    # make sure stock meets minimum liquidtiy requirements
+    for ticker in df['ticker']:
+        minLiquidity = False
+
+        # format ticker
+        ticker = BBG.bloombergTicker(ticker)
+
+        # get average daily volume for last 10 days
+        try:
+            volume = BBG.getSingleField(ticker, 'VOLUME_AVG_10D')
+            
+            if volume > 750000:
+                minLiquidity = True
+            else:
+                minLiquidity = False
+                
+        except:
+            pass
+
+        liquidity.append(minLiquidity)
+
+    df['min_liquidity'] = liquidity
+
+    df = df[df.min_liquidity == True]
 
     # print out date and time of report
     now = now.strftime('%m/%d/%Y %H:%M')

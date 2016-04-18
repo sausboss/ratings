@@ -31,7 +31,7 @@ def firmHistory(ticker, firm):
 
     # SQL request
     DB = connect()
-    df = pd.read_sql("select date, analyst, type, performancepct from ratings_change join performance on ratings_change.id = performance.event_id where ticker = %(ticker)s and firm like %(firm)", DB, params={'ticker' : ticker, 'firm' : firm})
+    df = pd.read_sql("select t1date, analyst, type, rating, performancepct from ratings_change join performance on ratings_change.id = performance.event_id where ticker = %(ticker)s and firm like %(firm)s and earnings = False", DB, params={'ticker' : ticker, 'firm' : firm})
 
     DB.close()
 
