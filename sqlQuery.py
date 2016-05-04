@@ -1,8 +1,9 @@
 import psycopg2
 import pandas as pd
 import userInfo
-import pdb
-
+import pdb, traceback, sys
+import datetime
+import pytz
 
 """
 Contains functions to retrive information from DB via commonly used queries.
@@ -12,6 +13,7 @@ Funtcions that return dataframes, to be used in ipython for further analysis.
 
 # get login information
 loginValues = userInfo.loginValues
+
 
 def connect():
     """
@@ -35,7 +37,17 @@ def firmHistory(ticker, firm):
 
     DB.close()
 
-    return df
+    print ""
+    print ""
+
+    if df.empty:
+        print " NO RESULTS FOUND"
+    else:
+        print df
+
+    print ""
+    print ""
+
 
 def tickerMoving(ticker):
     """
@@ -51,9 +63,29 @@ def tickerMoving(ticker):
 
     DB.close()
 
+    print ""
     print upDf
     print ""
     print downDf
+    print ""
+    print ""
+
+
+def returnEvent(ticker, firm, date):
+    """
+    look up event details from ratings_change table
+    """
+
+    DB = connect()
+
+    event = pd.read_sql("select * from ratings_change where ticker = %(ticker)s and firm = %(firm)s and date < %(date)s and date < (%(date)s::date + '1 day'::interval)", DB, params={'ticker' : ticker, 'firm' : firm, 'date' : date})
+
+    DB.close()
+
+    print ""
+    print event
+    print ""
+    print ""
 
 
 def analystReturn(name):
@@ -71,9 +103,12 @@ def analystReturn(name):
     # gets median absolute performance of all "action" calls
     (performance, count) = absolutePerformance(upgradeDf, downgradeDf)
 
+    print ""
     print name
     print "Action Calls"
     print " | " + str(performance) + " | "  "# of calls = " + str(count)
+    print ""
+    print ""
 
 
 def firmReturn(firmName):
@@ -97,6 +132,7 @@ def firmReturn(firmName):
     # gets median absolute performance of all "action" calls
     (performance, count) = absolutePerformance(upgradeDf, downgradeDf)
 
+    print ""
     print dbNames.values
     print "Action Calls"
     print " | " + str(performance) + " | "  "# of calls = " + str(count)
@@ -123,9 +159,12 @@ def firmPerformanceByRegion(firmName, fx):
     # gets median absolute performance of all "action" calls
     (performance, count) = absolutePerformance(upgradeDf, downgradeDf)
 
+    print ""
     print firmName
     print "Action Calls"
     print " | " + str(performance) + " | "  "# of calls = " + str(count)
+    print ""
+    print ""
 
 
 def absolutePerformance(upgradeDf, downgradeDf):
@@ -200,7 +239,7 @@ def absolutePerformance(upgradeDf, downgradeDf):
 
 def pastDate(date):
     """
-    takes in date string and returns dataframe with events and coresponding performance 
+    takes in date string and returns dataframe with joined ratings_change and performance tables
     """
 
     DB = connect()
@@ -231,6 +270,7 @@ def fromOpen(date):
 
     otherDf = df[(df.type != 'upgrade') & (df.type != 'downgrade')]
 
+    print ""
     print "Upgrades"
     print "--------"
     print upDf.loc[:, outputs]
@@ -244,3 +284,147 @@ def fromOpen(date):
     print "Other Calls"
     print "-----------"
     print otherDf.loc[:, outputs]
+    print ""
+    print ""
+    print ""
+
+
+def funcOptions():
+
+    print ""
+    print "----------------------------------------------------------"
+    print ""
+    print " Event Details | Firm History  |  Ticker Moving  |  Analyst Return"
+    print ""
+    print " Firm Return  |  Firm Return by Region  |  From Open"
+    print ""
+    print ""
+
+
+def firmInput():
+    """
+    takes in user text, and returns string formated for DB
+    """
+
+    firm = raw_input('Firm: ')
+    firm = str(firm)
+    firm = firm.title()
+
+    return firm
+
+
+def tickerInput():
+    """
+    takes in user text, returns string fromated for DB
+    """
+
+    ticker = raw_input('Ticker: ')
+    ticker = str(ticker)
+    ticker = ticker.upper()
+
+    return ticker
+
+
+def dateInput():
+    """
+    takes in user text, returns a datetime obeject
+    """
+
+    date = raw_input('Date (mmddyy): ')
+
+    # make sure an integer is used
+    if not int(date):
+        dateInput()
+
+    date = str(date)
+
+    # check to aee if date is in correct format
+    if len(date) != 6:
+        dateInput()
+
+    # format string into an aware-datetime object
+    dateDT = datetime.datetime.strptime(date, '%m%d%y')
+    dateDT = pytz.timezone('America/New_York').localize(dateDT).astimezone(pytz.timezone('America/New_York'))
+
+    return dateDT
+
+
+def nameInput():
+
+    name = raw_input('Analyst Name > ')
+    name = str(name)
+    name = name.title()
+
+
+def start():
+    """
+    allows for easy user input
+    """
+
+    func = raw_input("Choose function > ")
+    func = str(func)
+
+    # make lowercase for uniformity
+    func = func.lower()
+
+    if func == 'firm history':
+
+        ticker = tickerInput()
+        firm = firmInput()
+
+        firmHistory(ticker, firm)
+
+    elif func == 'ticker moving':
+
+        ticker = tickerInput()
+        tickerMoving(ticker)
+
+    elif func == 'analyst return':
+
+        name = nameInput()
+        analystReturn(name)
+
+    elif func == 'firm return':
+
+        firm = firmInput
+        firmReturn(firm)
+
+    elif func == 'firm return by region':
+
+        firm = firmInput()
+        fx = raw_input('FX > ')
+        fx = str(fx)
+
+        firmPerformanceByRegion(firm, fx)
+
+    elif func == 'from open':
+
+        date = dateInput()
+
+        fromOpen(date)
+
+    elif func == 'event details':
+
+        ticker = tickerInput()
+        firm = firmInput()
+        date = dateInput()
+
+        returnEvent(ticker, firm, date)
+
+    else:
+        print " re-enter function name"
+        start()
+
+    funcOptions()
+    start()
+
+
+if __name__ == '__main__':
+    try:
+        funcOptions()
+        start()
+
+    except:
+        type, value, tb, = sys.exc_info()
+        traceback.print_exc()
+        pdb.post_mortem(tb)

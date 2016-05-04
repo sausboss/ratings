@@ -15,8 +15,9 @@ def calculateCutoff():
     now = pytz.timezone('America/New_York').localize(now).astimezone(pytz.timezone('America/New_York'))
     yesterday = now - pd.tseries.offsets.BDay()
     yesterday = datetime.datetime.date(yesterday)
-
-    cutOff = datetime.datetime.combine(yesterday, datetime.time(15, 00))
+    
+    # use yesterday at 4pm as the cut-off
+    cutOff = datetime.datetime.combine(yesterday, datetime.time(16, 00))
 
     return cutOff
 
@@ -64,7 +65,6 @@ def todaysList():
     # scrub df for events that could be affected by earnings
     df = df[df.earnings == False]
 
-    # TODO
     # make sure stock meets minimum liquidtiy requirements
     for ticker in df['ticker']:
         minLiquidity = False
@@ -76,7 +76,7 @@ def todaysList():
         try:
             volume = BBG.getSingleField(ticker, 'VOLUME_AVG_10D')
             
-            if volume > 750000:
+            if volume > 2000000:
                 minLiquidity = True
             else:
                 minLiquidity = False
@@ -91,11 +91,17 @@ def todaysList():
     df = df[df.min_liquidity == True]
 
     # print out date and time of report
+    yesterday = cutOff.strftime('%m/%d/%Y %H:%M')
     now = now.strftime('%m/%d/%Y %H:%M')
 
     print ""
-    print "Report as of"
-    print now
+    print ""
+    print ""
+    print ""
+    print ""
+    print ""
+    print "Report includes events bewteen:"
+    print yesterday + " - " + now
     print ""
 
     return df
@@ -148,7 +154,6 @@ def analystScreen(df):
     print ""
     print "ANALYST SCREEN"
     print "--------------"
-    print ""
     print ""
 
     # isolate upgrade action calls performance and return median value
@@ -271,7 +276,6 @@ def antiConsensus(df):
 
     eventDf = eventDf[eventDf.date > timeFrame]
 
-    print ""
     print "ANTI CONSENSUS CALLS"
     print "--------------------"
 
@@ -332,12 +336,77 @@ def getMedian(df):
     return df
 
 
+def shortSqueeze(df):
+    """take in dataFrame and return event that has both an upgrade and high short interest
+    """
+
+    outputs = ['ticker', 'type', 'rating', 'pt', 'pt_med', 'firm']
+    upgrades = df[df.type == 'upgrade']
+    squeezeDf = upgrades[upgrades.short_interest > 5]
+
+    print ""
+    print "POTENTIAL SHORT SQUEEZES"
+    print "------------------------"
+
+    if squeezeDf.empty is False:
+
+        print squeezeDf.loc[:, outputs]
+        print ""
+        print ""
+
+
+def priceMove(df):
+    """
+    takes in daily list, runs performance review and returns events with upgrades or downgrades that are opposite the move
+    """
+
+    outputs = ['ticker', 'type', 'rating', 'pt', 'firm']
+
+    performanceList = []
+
+    # percent preformance threshold
+    threshold = 15
+
+    # 3 month performance of S&P
+    spxPerformance = BBG.getSingleField('SPX Index', 'CHG_PCT_3M')
+
+    for ticker in df['ticker']:
+
+        ticker = BBG.bloombergTicker(ticker)
+        ticker3M = BBG.getSingleField(ticker, 'CHG_PCT_3M')
+        ticker3M = ticker3M - spxPerformance
+
+        performanceList.append(ticker3M)
+
+    df['Rel_pf'] = performanceList
+
+    upDf = df[(df.type == 'upgrade') & (df.Rel_pf < - threshold)]
+    dnDf = df[(df.type == 'downgrade') & (df.Rel_pf > threshold)]
+
+    print ""
+    print "+- 10% IN LAST THREE MONTHS"
+    print "---------------------------"
+    print ""
+
+    print "Upgrades"
+    print "--------"
+    print upDf.loc[:, outputs]
+    print ""
+
+    print "Downgrades"
+    print "----------"
+    print dnDf.loc[:, outputs]
+    print ""
+
+
 if __name__ == '__main__':
     try:
         df = todaysList()
-        highLowScreen(df)
+        # highLowScreen(df)
         analystScreen(df)
         antiConsensus(df)
+        shortSqueeze(df)
+        priceMove(df)
 
     except:
         type, value, tb, = sys.exc_info()
